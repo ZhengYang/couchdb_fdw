@@ -18,11 +18,18 @@ port:		The port number on which the CouchDB server is listening.
 The following parameter can be set on a CouchDB foreign table:
 
 database:	The numeric ID of the CouchDB database to query.
-	  	Default: 0
+	  	Default: test
+
+<column name>:	The column mapping to remote JSON attributes.
+		If there is no column mapping specified, default is the origninal column name.
+		Please note that '_doc' is reserved for mapping the entire JSON document.
 
 The following parameter can be set on a user mapping for a CouchDB
 foreign server:
 
+username:	The username to authenticate to the CouchDB server with.
+		Default: <none>
+		
 password:	The password to authenticate to the CouchDB server with.
 		Default: <none>
 
@@ -35,11 +42,11 @@ CREATE SERVER couchdb_server
 
 CREATE FOREIGN TABLE couchdb_db0 (key text, value text) 
 	SERVER couchdb_server
-	OPTIONS (database '0');
+	OPTIONS (database 'testdb', key '_id', value '_doc');
 
 CREATE USER MAPPING FOR PUBLIC
 	SERVER couchdb_server
-	OPTIONS (password 'secret');
+	OPTIONS (username 'testuser', password 'secret');
 
 -- 
 Zheng Yang
