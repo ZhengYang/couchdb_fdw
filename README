@@ -1,8 +1,49 @@
-CouchDB FDW for PostgreSQL 9.1+
+CouchDB FDW (beta) for PostgreSQL 9.1+
 ==============================
 
 This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for
 the CouchDB document-oriented database: http://couchdb.apache.org/
+
+IMPORTANT: There're bugs in the existing version. I'm working on it and will
+be releasing another version very soon.
+
+
+Building
+--------
+
+To build the code, you need the yajl(Yet Another JSON Parser) installed 
+on your system. You can checkout the yajl from GitHub:
+https://github.com/lloyd/yajl
+OR
+download from:
+http://lloyd.github.com/yajl/
+
+Once that's done, the extension can be built with:
+
+PATH=/usr/local/pgsql91/bin/:$PATH make USE_PGXS=1 make
+sudo PATH=/usr/local/pgsql91/bin/:$PATH make USE_PGXS=1 install
+
+(assuming you have PostgreSQL 9.1 in /usr/local/pgsql91).
+
+I've tested on Mac OS X 10.6 only, but other *nix's should also work.
+I haven't tested on Windows, but the code should be good on MinGW.
+
+Limitations
+-----------
+
+- If there is no quals to pushdown, we get a list of '_id's to begin with,
+  and then fetch whatever records still exist as we build the tuples.
+
+- We can only pushdown '_id' (w/o '_rev') to CouchDB, which must use the 
+  TEXTEQ operator.
+
+- The top-level-attributes of a document can be mapped to columns in a
+  foreign table.
+  
+- In case you want the map a column to the entire JOSN doc, use 
+	columnname '_doc'
+  in foreign table options (which means your remote couchdb shouldn't have
+  a top-level-attribute called '_doc', otherwise there will be conficts).
 
 Usage
 -----
