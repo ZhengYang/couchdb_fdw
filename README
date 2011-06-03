@@ -34,8 +34,8 @@ Limitations
 - If there is no quals to pushdown, we get a list of '_id's to begin with,
   and then fetch whatever records still exist as we build the tuples.
 
-- We can only pushdown '_id' (w/o '_rev') to CouchDB, which must use the 
-  TEXTEQ operator.
+- We can only pushdown '_id' (with or without '_rev') to CouchDB, which must use 
+  the TEXTEQ operator.
 
 - The top-level-attributes of a document can be mapped to columns in a
   foreign table.
