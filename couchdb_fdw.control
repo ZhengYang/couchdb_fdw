@@ -1,0 +1,19 @@
+##########################################################################
+#
+#                foreign-data wrapper for CouchDB
+#
+# Copyright (c) 2011, PostgreSQL Global Development Group
+#
+# This software is released under the PostgreSQL Licence
+#
+# Author: Zheng Yang <zhengyang4k@gmail.com>
+#
+# IDENTIFICATION
+#                 couchdb_fdw/couchdb_fdw.control
+# 
+##########################################################################
+
+comment = 'Foreign data wrapper for querying a CouchDB server'
+default_version = '1.0'
+module_pathname = '$libdir/couchdb_fdw'
+relocatable = true
