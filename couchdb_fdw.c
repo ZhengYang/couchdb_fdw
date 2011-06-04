@@ -273,7 +273,9 @@ couchdb_fdw_validator(PG_FUNCTION_ARGS)
 	char	*password = NULL;
 	ListCell	*cell;
 	
+#ifdef DEBUG
 	elog(NOTICE, "couchdb_fdw_validator");
+#endif
 	
 	/*
 	 * Check that the necessary options: address, port, database
@@ -372,8 +374,10 @@ static bool
 couchdbIsValidOption(const char *option, Oid context)
 {
 	struct CouchDBFdwOption *opt;
-	
+
+#ifdef DEBUG
 	elog(NOTICE, "couchdbIsValidOption");
+#endif
 	
 	/* Check if the options presents in the valid option list */
 	for (opt = valid_options; opt->optname; opt++)
@@ -403,8 +407,10 @@ couchdbGetOptions(Oid foreigntableid, char **address, int *port, char **database
 	UserMapping	*mapping;
 	List		*options;
 	ListCell	*lc;
-	
+
+#ifdef DEBUG
 	elog(NOTICE, "couchdbGetOptions");
+#endif
 	
 	/*
 	 * Extract options from FDW objects.
@@ -451,7 +457,11 @@ couchdbGetOptions(Oid foreigntableid, char **address, int *port, char **database
 		/* Column mapping goes here */
 		*mapping_list = lappend(*mapping_list, def);
 	}
+	
+#ifdef DEBUG
 	elog(NOTICE, "list length: %i", (*mapping_list)->length);
+#endif
+	
 	/* Default values, if required */
 	if (!*address)
 		*address = "127.0.0.1";
@@ -485,9 +495,10 @@ couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *basere
 	char	*password = NULL;
 	int		dbsize = 0;
 	List	*col_mapping_list;
-	
+
+#ifdef DEBUG
 	elog(NOTICE, "couchdbPlanForeignScan");
-	
+#endif
 	
 	/* Fetch options  */
 	couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
@@ -511,7 +522,10 @@ couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *basere
 	couchdbGetDatabaseSize(svr_address, svr_port, svr_database, username, password, &dbsize);
 	
 	fdwplan->total_cost = fdwplan->total_cost + dbsize;
+	
+#ifdef DEBUG
 	elog(NOTICE, "new total cost: %f", fdwplan->total_cost);
+#endif
 	
 	return fdwplan;
 }
@@ -545,7 +559,9 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
 	bool	pushdown = FALSE;
 	int i;
 	
+#ifdef DEBUG
 	elog(NOTICE, "couchdbBeginForeignScan");
+#endif
 	
 	/* fetch options */
 	couchdbGetOptions(RelationGetRelid(node->ss.ss_currentRelation), &svr_address, &svr_port, 
@@ -612,9 +628,11 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
 	festate->attinmeta = TupleDescGetAttInMetadata(node->ss.ss_currentRelation->rd_att);
 	node->fdw_state = (void *) festate;
 	
+#ifdef DEBUG
 	for (i = 0; i<BUFFER_SIZE; i++) {
 		elog(NOTICE, "%i: %s", i, id_buffer[i].data);
 	}
+#endif
 	
 	/* See if we've got a qual we can push down */
 	qual_list = NIL;
@@ -680,8 +698,10 @@ couchdbIterateForeignScan(ForeignScanState *node)
 	List	*qual_list;
 	bool	qual_scanned;
 	bool	endOfScan;
-	
+
+#ifdef DEBUG
 	elog(NOTICE, "couchdbIterateForeignScan");
+#endif
 	
 	endOfScan = false;
 	
@@ -809,8 +829,10 @@ couchdbExplainForeignScan(ForeignScanState *node, ExplainState *es)
 	
 	CouchDBFdwExecutionState *festate;
 	int	dbsize;
-	
+
+#ifdef DEBUG
 	elog(NOTICE, "couchdbExplainForeignScan");
+#endif
 	
 	festate = (CouchDBFdwExecutionState *) node->fdw_state;
 	
@@ -832,8 +854,10 @@ static void
 couchdbEndForeignScan(ForeignScanState *node)
 {
 	CouchDBFdwExecutionState *festate;
-	
+
+#ifdef DEBUG
 	elog(NOTICE, "couchdbEndForeignScan");
+#endif
 	
 	festate = (CouchDBFdwExecutionState *) node->fdw_state;
 	
@@ -856,8 +880,10 @@ static void
 couchdbReScanForeignScan(ForeignScanState *node)
 {
 	CouchDBFdwExecutionState *festate;
-	
+
+#ifdef DEBUG
 	elog(NOTICE, "couchdbReScanForeignScan");
+#endif
 	
 	festate = (CouchDBFdwExecutionState *) node->fdw_state;
 	
@@ -879,7 +905,9 @@ couchdbGetDatabaseSize(const char *address, const int port, const char *database
 	yajl_alloc_funcs	*funcs;
 	yajl_callbacks		*callbacks;
 	
+#ifdef DEBUG
 	elog(NOTICE, "couchdbGetDatabaseInfo");
+#endif
 	
 	if (username != NULL && password != NULL) {
 		initStringInfo(&auth_str);
@@ -893,8 +921,9 @@ couchdbGetDatabaseSize(const char *address, const int port, const char *database
 	initStringInfo(&dbsize_url);
 	appendStringInfo(&dbsize_url, "http://%s%s:%i/%s", hasAuth ? auth_str.data : "", address, port,database );
 	
+#ifdef DEBUG
 	elog(NOTICE, "%s", dbsize_url.data);
-	
+#endif
 	
 	
 	callbacks = (yajl_callbacks *) palloc(sizeof(yajl_callbacks));
@@ -936,7 +965,10 @@ couchdbGetDatabaseSize(const char *address, const int port, const char *database
 	curl_easy_perform(curl);
 	curl_easy_cleanup(curl);
 	
+#ifdef DEBUG
 	elog(NOTICE, "num of docs: %ld", ctx->doc_count);
+#endif
+	
 	*dbsize = ctx->doc_count;
 }
 
@@ -997,7 +1029,9 @@ couchdbGetDoc(const char *address, const int port, const char *database,
 	bool	hasAuth;
 	bool	hasRev;
 	
+#ifdef DEBUG
 	elog(NOTICE, "couchdbGetDoc");
+#endif
 	
 	/* Check if there is authen info specified */
 	if (username != NULL && password != NULL) {
@@ -1025,10 +1059,11 @@ couchdbGetDoc(const char *address, const int port, const char *database,
 	appendStringInfo(&doc_url, "http://%s%s:%i/%s/%s%s", 
 					 hasAuth ? auth_str.data : "", address, port, database, id, 
 					 hasRev ? rev_str.data : "");
-	
+#ifdef DEBUG
 	elog(NOTICE, "%s", doc_url.data);
+#endif
 	
-	//example: http://127.0.0.1:5984/cooldb/123456?rev=1-abc
+	/* example: http://127.0.0.1:5984/cooldb/123456?rev=1-abc */
 	
 	
 	callbacks = (yajl_callbacks *) palloc(sizeof(yajl_callbacks));
@@ -1097,8 +1132,11 @@ couchdbGetDoc(const char *address, const int port, const char *database,
 	yajl_gen_free(gen);
 	yajl_free(handle);
 	*/
+	
+#ifdef DEBUG
 	elog(NOTICE, "columndata: '%s'", (*column_data)[0].data);
 	elog(NOTICE, "columndata: '%s'", (*column_data)[1].data);
+#endif
 }
 
 static size_t
@@ -1117,9 +1155,12 @@ couchdbdoc_writer(void *buffer, size_t size, size_t nmemb, void *userp)
 
 static int doc_handle_null(void * ctx)
 {
-	//elog(NOTICE, "doc_handle_null");
 	doc_context *context;
 	yajl_gen doc_gen;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_null");
+#endif
 	
 	context = (doc_context *) ctx;
 	
@@ -1152,9 +1193,12 @@ static int doc_handle_null(void * ctx)
 
 static int doc_handle_boolean(void * ctx, int boolean)
 {
-	//elog(NOTICE, "doc_handle_boolean");
 	doc_context *context;
 	yajl_gen doc_gen;
+
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_boolean");
+#endif
 	
 	context = (doc_context *) ctx;
 	
@@ -1188,21 +1232,29 @@ static int doc_handle_boolean(void * ctx, int boolean)
 
 static int doc_handle_integer(void *ctx, long long integerVal)
 {
-	//elog(NOTICE, "%s");
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_integer");
+#endif
+	
 	return 1;
 }
 
 static int doc_handle_double(void *ctx, double doubleVal)
 {
-	//elog(NOTICE, "%s");
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_double");
+#endif
 	return 1;
 }
 
 static int doc_handle_number(void * ctx, const char * s, size_t l)
 {
-	//elog(NOTICE, "doc_handle_number");
 	doc_context *context;
 	yajl_gen doc_gen;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_number");
+#endif
 	
 	context = (doc_context *) ctx;
 	
@@ -1228,7 +1280,6 @@ static int doc_handle_number(void * ctx, const char * s, size_t l)
 			yajl_gen gen;
 			
 			gen = (yajl_gen) context->gen;
-			//elog("number function: %s", s);
 			return yajl_gen_status_ok == yajl_gen_number(gen, s, l);
 		}
 	}
@@ -1237,11 +1288,14 @@ static int doc_handle_number(void * ctx, const char * s, size_t l)
 static int doc_handle_string(void * ctx, const unsigned char * stringVal,
 							 size_t stringLen)
 {	
-	//elog(NOTICE, "doc_handle_string");
 	doc_context *context;
 	yajl_gen doc_gen;
 	
 	context = (doc_context *) ctx;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_string");
+#endif
 	
 	/* for _doc attr if exits */
 	doc_gen = context->doc_gen;
@@ -1273,9 +1327,12 @@ static int doc_handle_string(void * ctx, const unsigned char * stringVal,
 
 static int doc_handle_start_map (void *ctx)
 {
-	//elog(NOTICE, "doc_handle_start_map");
 	doc_context *context;
 	yajl_gen doc_gen;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_start_map");
+#endif
 	
 	context = (doc_context *) ctx;
 	(context->depth) ++;
@@ -1300,11 +1357,14 @@ static int doc_handle_start_map (void *ctx)
 static int doc_handle_map_key(void *ctx, const unsigned char * stringVal,
 							  size_t stringLen)
 {	
-	//elog(NOTICE, "doc_handle_map_key");
 	doc_context *context;
 	StringInfoData *column_list;
 	StringInfoData map_key;
 	yajl_gen doc_gen;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_map_key");
+#endif
 	
 	context = (doc_context *) ctx;
 	initStringInfo(&map_key);
@@ -1348,9 +1408,12 @@ static int doc_handle_map_key(void *ctx, const unsigned char * stringVal,
 
 static int doc_handle_end_map(void * ctx)
 {
-	//elog(NOTICE, "doc_handle_end_map");
 	doc_context *context;
 	yajl_gen doc_gen;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_end_map");
+#endif
 	
 	context = (doc_context *) ctx;
 	(context->depth) --;
@@ -1419,10 +1482,13 @@ static int doc_handle_end_map(void * ctx)
 }
 
 static int doc_handle_start_array(void * ctx)
-{
-	//elog(NOTICE, "doc_handle_start_array");
+{	
     doc_context *context;
 	yajl_gen doc_gen;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_start_array");
+#endif
 	
 	context = (doc_context *) ctx;
 	context->depth ++;
@@ -1445,10 +1511,13 @@ static int doc_handle_start_array(void * ctx)
 }
 
 static int doc_handle_end_array(void * ctx)
-{
-	//elog(NOTICE, "doc_handle_end_array");
+{	
     doc_context *context;
 	yajl_gen doc_gen;
+	
+#ifdef DEBUG
+	elog(NOTICE, "doc_handle_end_array");
+#endif
 	
 	context = (doc_context *) ctx;
 	context->depth --;
@@ -1514,7 +1583,9 @@ couchdbGetAllDocs(const char *address, const int port, const char *database, con
 	bool	hasStartkey;
 	bool	hasLimit;
 	
+#ifdef DEBUG
 	elog(NOTICE, "couchdbGetAllDocs");
+#endif
 	
 	/* Check if there is authen info specified */
 	if (username != NULL && password != NULL) {
@@ -1553,9 +1624,11 @@ couchdbGetAllDocs(const char *address, const int port, const char *database, con
 					 hasAuth ? auth_str.data : "", address, port, database, descending ? "true" : "false", 
 					 hasStartkey ? startkey_str.data : "", hasLimit ? limit_str.data : "");
 	
-	//example: http://127.0.0.1:5984/cooldb/_all_docs?descending=false?startkey=123&limit=50
+	/* example: http://127.0.0.1:5984/cooldb/_all_docs?descending=false?startkey=123&limit=50 */
 	
+#ifdef DEBUG
 	elog(NOTICE, "%s", alldocs_url.data);
+#endif
 	
 	/* init array of strings to hold fetched ids */
 	*ids = (StringInfoData *) palloc(sizeof(StringInfoData) * (hasLimit ? limit : 0));
@@ -1621,6 +1694,10 @@ static int alldocs_handle_number(void * ctx, const char * s, size_t l)
 	/* If the value's key is doc_count, store it into the id_buffer array  */
 	alldocs_context *context;
 	
+#ifdef DEBUG
+	elog(NOTICE, "alldocs_handle_number");
+#endif
+	
 	context = (alldocs_context *) ctx;
 	
 	if ( strcmp("total_rows", context->map_key) == 0 ) {
@@ -1639,6 +1716,10 @@ static int alldocs_handle_string(void * ctx, const unsigned char * stringVal,
 	alldocs_context	*context;
 	StringInfoData	str;
 	
+#ifdef DEBUG
+	elog(NOTICE, "alldocs_handle_string");
+#endif
+	
 	context = (alldocs_context *) ctx;
 	
 	if ( strcmp("id", context->map_key) == 0 ) {
@@ -1655,6 +1736,10 @@ static int alldocs_handle_map_key(void * ctx, const unsigned char * stringVal,
 {	
 	StringInfoData map_key;
 	alldocs_context * context;
+	
+#ifdef DEBUG
+	elog(NOTICE, "alldocs_handle_map_key");
+#endif
 	
 	initStringInfo(&map_key);
 	appendBinaryStringInfo(&map_key, (char *) stringVal, (int) stringLen);
@@ -1674,12 +1759,13 @@ static void
 couchdbGetQual(Node *node, TupleDesc tupdesc, List *col_mapping_list, char **key, char **value, bool *equal)
 {
 	ListCell *col_mapping;
-	
-	elog(NOTICE, "couchdbGetQual");
-	
 	*key = NULL;
 	*value = NULL;
 	*equal = false;
+	
+#ifdef DEBUG
+	elog(NOTICE, "couchdbGetQual");
+#endif
 	
 	if (!node)
 		return;
@@ -1731,8 +1817,9 @@ couchdbGetQual(Node *node, TupleDesc tupdesc, List *col_mapping_list, char **key
 			
 			if (op->opfuncid == PROCID_TEXTEQ)
 				*equal = true;
-			
+#ifdef DEBUG
 			elog(NOTICE, "Got qual %s = %s", *key, *value);
+#endif
 			return;
 		}
 	}
