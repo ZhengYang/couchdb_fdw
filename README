@@ -11,12 +11,17 @@ be releasing another version very soon.
 Building
 --------
 
-To build the code, you need the yajl(Yet Another JSON Library) installed 
-on your system. You can checkout the yajl from GitHub:
+To build the code, you need the yajl(Yet Another JSON Library) and libcurl installed 
+on your system. 
+
+You can checkout the yajl from GitHub:
 https://github.com/lloyd/yajl
 OR
 download from:
 http://lloyd.github.com/yajl/
+
+libcurl C interface can be found here:
+http://curl.haxx.se/libcurl/c/
 
 Once that's done, the extension can be built with:
 
