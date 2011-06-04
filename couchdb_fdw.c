@@ -14,6 +14,9 @@
  *----------------------------------------------------------
  */
 
+/* Debug mode flag */
+/* #define DEBUG */
+
 #include "postgres.h"
 
 #include <string.h>
