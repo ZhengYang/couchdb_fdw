@@ -1,5 +1,5 @@
 CouchDB FDW (beta) for PostgreSQL 9.1+
-==============================
+======================================
 
 This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for
 the CouchDB document-oriented database: http://couchdb.apache.org/
@@ -84,7 +84,7 @@ Example
 
 CREATE SERVER couchdb_server 
 	FOREIGN DATA WRAPPER couchdb_fdw 
-	OPTIONS (address '127.0.0.1', port '6379');
+	OPTIONS (address '127.0.0.1', port '5984');
 
 CREATE FOREIGN TABLE couchdb_table (key text, value text) 
 	SERVER couchdb_server
