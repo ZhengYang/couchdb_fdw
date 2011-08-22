@@ -63,7 +63,7 @@ port:		The port number on which the CouchDB server is listening.
 
 The following parameter can be set on a CouchDB foreign table:
 
-database:	The numeric ID of the CouchDB database to query.
+database:	The name of the CouchDB database to query.
 	  	Default: test
 
 <column name>:	The column mapping to remote JSON attributes.
