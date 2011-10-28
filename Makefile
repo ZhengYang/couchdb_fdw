@@ -10,7 +10,7 @@
 #
 # IDENTIFICATION
 #                 couchdb_fdw/Makefile
-# 
+#
 ##########################################################################
 
 MODULE_big = couchdb_fdw

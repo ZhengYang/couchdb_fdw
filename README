@@ -11,8 +11,8 @@ be releasing another version very soon.
 Building
 --------
 
-To build the code, you need the yajl(Yet Another JSON Library) and libcurl installed 
-on your system. 
+To build the code, you need the yajl(Yet Another JSON Library) and libcurl installed
+on your system.
 
 You can checkout the yajl from GitHub:
 https://github.com/lloyd/yajl
@@ -39,13 +39,13 @@ Limitations
 - If there is no quals to pushdown, we get a list of '_id's to begin with,
   and then fetch whatever records still exist as we build the tuples.
 
-- We can only pushdown '_id' (with or without '_rev') to CouchDB, which must use 
+- We can only pushdown '_id' (with or without '_rev') to CouchDB, which must use
   the TEXTEQ operator.
 
 - The top-level-attributes of a document can be mapped to columns in a
   foreign table.
-  
-- In case you want the map a column to the entire JOSN doc, use 
+
+- In case you want the map a column to the entire JOSN doc, use
 	columnname '_doc'
   in foreign table options (which means your remote couchdb shouldn't have
   a top-level-attribute called '_doc', otherwise there will be conficts).
@@ -75,18 +75,18 @@ foreign server:
 
 username:	The username to authenticate to the CouchDB server with.
 		Default: <none>
-		
+
 password:	The password to authenticate to the CouchDB server with.
 		Default: <none>
 
 Example
 -------
 
-CREATE SERVER couchdb_server 
-	FOREIGN DATA WRAPPER couchdb_fdw 
+CREATE SERVER couchdb_server
+	FOREIGN DATA WRAPPER couchdb_fdw
 	OPTIONS (address '127.0.0.1', port '5984');
 
-CREATE FOREIGN TABLE couchdb_table (key text, value text) 
+CREATE FOREIGN TABLE couchdb_table (key text, value text)
 	SERVER couchdb_server
 	OPTIONS (database 'testdb', key '_id', value '_doc');
 
@@ -94,6 +94,6 @@ CREATE USER MAPPING FOR PUBLIC
 	SERVER couchdb_server
 	OPTIONS (username 'testuser', password 'secret');
 
--- 
+--
 Zheng Yang
 zhengyang4k@gmail.com
