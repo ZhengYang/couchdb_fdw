@@ -14,6 +14,15 @@
  *----------------------------------------------------------
  */
 
+/*----------------------------------------------------------
+ *
+ * Ported to PostgreSQL 9.2+ Foreign Data Wrapper API
+ *
+ * Author: Gauthier Boabglio <gauthier.boaglio _4t_ gmail _D0t_ com>
+ *
+ *----------------------------------------------------------
+ */
+
 /*
  * information for ForeignScanState.fdw_state
  */
@@ -111,7 +120,18 @@ struct CouchDBFdwOption
 /*
  * FDW callback routines
  */
-static FdwPlan *couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel);
+// New 9.2 Api
+#if (PG_VERSION_NUM >= 90200)
+	static void couchdbGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
+	static void couchdbGetForeignPaths(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid);
+	static bool couchdbAnalyzeForeignTable(Relation relation,AcquireSampleRowsFunc *func,BlockNumber *totalpages);
+	static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses);
+	// New
+	static void estimate_costs(PlannerInfo *root,RelOptInfo *baserel,Cost *startup_cost,Cost *total_cost,Oid foreigntableid);
+#else
+	static FdwPlan *couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel);
+#endif
+
 static void couchdbExplainForeignScan(ForeignScanState *node, ExplainState *es);
 static void couchdbBeginForeignScan(ForeignScanState *node, int eflags);
 static TupleTableSlot *couchdbIterateForeignScan(ForeignScanState *node);
