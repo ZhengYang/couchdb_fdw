@@ -1,4 +1,4 @@
-CouchDB FDW (beta) for PostgreSQL 9.1+
+CouchDB FDW (beta) for PostgreSQL 9.2+
 ======================================
 
 This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for
@@ -97,3 +97,7 @@ CREATE USER MAPPING FOR PUBLIC
 -- 
 Zheng Yang
 zhengyang4k@gmail.com
+--
+Ported to PostgreSQL 9.2+ Foreign Data Wrapper API
+Gauthier Boaglio
+gauthier.boaglio _4t_ gmail _D0t_ com
