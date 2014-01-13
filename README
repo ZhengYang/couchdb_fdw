@@ -82,11 +82,7 @@ password:	The password to authenticate to the CouchDB server with.
 Example
 -------
 
-* Get Apache CouchDB Windows binary - [Download](http://wwwftp.ciril.fr/pub/apache/couchdb/binary/win/).*
-
-**Start your CouchDB server, and we're good to go:**
-
-* Initializing the server using curl:
+* Initializing the CouchDB server using curl:
 
 	- Create database:
 		curl -X PUT http://localhost:5984/testdb
