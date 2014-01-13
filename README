@@ -82,17 +82,52 @@ password:	The password to authenticate to the CouchDB server with.
 Example
 -------
 
-CREATE SERVER couchdb_server 
-	FOREIGN DATA WRAPPER couchdb_fdw 
-	OPTIONS (address '127.0.0.1', port '5984');
+* Get Apache CouchDB Windows binary - [Download](http://wwwftp.ciril.fr/pub/apache/couchdb/binary/win/).*
 
-CREATE FOREIGN TABLE couchdb_table (key text, value text) 
-	SERVER couchdb_server
-	OPTIONS (database 'testdb', key '_id', value '_doc');
+**Start your CouchDB server, and we're good to go:**
 
-CREATE USER MAPPING FOR PUBLIC
-	SERVER couchdb_server
-	OPTIONS (username 'testuser', password 'secret');
+* Initializing the server using curl:
+
+	- Create database:
+			curl -X PUT http://localhost:5984/testdb
+	- List databases:
+			curl -X GET http://localhost:5984/_all_dbs
+	- Create document:
+			curl -X PUT http://localhost:5984/testdb/mydoc_1 -d "{\"title\": \"My first document\", \"content\": \"Hello World!\"}"
+	- Create user:
+			curl -HContent-Type:application/json -vXPUT http://127.0.0.1:5984/_users/org.couchdb.user:testuser --data-binary "{\"_id\": \"org.couchdb.user:testuser\",\"name\": \"testuser\",\"roles\": [],\"type\": \"user\",\"password\": \"secret\"}"
+
+* Testing extension:
+			
+	:::sql
+	CREATE EXTENSION couchdb_fdw;
+	
+	--Then create a foreign server to connect to your CouchDB server:
+
+	CREATE SERVER couchdb_server 
+		FOREIGN DATA WRAPPER couchdb_fdw 
+		OPTIONS (address '127.0.0.1', port '5984');
+
+	-- Create a foreign table:
+
+	CREATE FOREIGN TABLE couchdb_table (key text, value text) 
+		SERVER couchdb_server
+		OPTIONS (database 'testdb', key '_id', value '_doc');
+
+	--Create user mapping:
+
+	CREATE USER MAPPING FOR PUBLIC
+		SERVER couchdb_server
+		OPTIONS (username 'testuser', password 'secret');	
+		
+	--And list documents...
+	
+	SELECT * FROM couchdb_table;
+
+
+* Ouput gives:
+
+"mydoc_1";"{"_id":"mydoc_1","_rev":"1-2fe116a139a166a7f85b85387327d4bc","title":"My first document","content":"Hello World!"}"
 
 -- 
 Zheng Yang
