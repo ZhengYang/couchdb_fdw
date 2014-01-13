@@ -14,6 +14,15 @@
  *----------------------------------------------------------
  */
 
+/*----------------------------------------------------------
+ *
+ * Ported to PostgreSQL 9.2+ Foreign Data Wrapper API
+ *
+ * Author: Gauthier Boabglio <gauthier.boaglio _4t_ gmail _D0t_ com>
+ *
+ *----------------------------------------------------------
+ */
+
 /* Debug mode flag */
 /* #define DEBUG */
 
@@ -41,6 +50,16 @@
 #include <yajl/yajl_parse.h>
 #include <yajl/yajl_common.h>
 #include <yajl/yajl_gen.h>
+
+
+// New 9.2 Api
+#if (PG_VERSION_NUM >= 90200)
+#include "optimizer/pathnode.h"
+#include "optimizer/restrictinfo.h"
+#include "optimizer/planmain.h"
+#include "utils/rel.h"
+#endif
+
 
 #include "couchdb_fdw.h"
 
@@ -112,7 +131,14 @@ couchdb_fdw_handler(PG_FUNCTION_ARGS)
 {
     FdwRoutine *fdwroutine = makeNode(FdwRoutine);
 
-    fdwroutine->PlanForeignScan = couchdbPlanForeignScan;
+    // New 9.2 Api
+    //fdwroutine->PlanForeignScan = couchdbPlanForeignScan;
+    fdwroutine->GetForeignRelSize = couchdbGetForeignRelSize;
+    fdwroutine->GetForeignPaths = couchdbGetForeignPaths;
+    fdwroutine->AnalyzeForeignTable = couchdbAnalyzeForeignTable;
+    fdwroutine->GetForeignPlan = couchdbGetForeignPlan;
+
+
     fdwroutine->ExplainForeignScan = couchdbExplainForeignScan;
     fdwroutine->BeginForeignScan = couchdbBeginForeignScan;
     fdwroutine->IterateForeignScan = couchdbIterateForeignScan;
@@ -357,57 +383,6 @@ couchdbGetOptions(Oid foreigntableid, char **address, int *port, char **database
         *password = NULL;
 }
 
-
-/*
- * couchdbPlanForeignScan
- *		Create a FdwPlan for a scan on the foreign table
- */
-static FdwPlan *
-couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
-{
-    FdwPlan	*fdwplan;
-    char	*svr_address = NULL;
-    int		svr_port = 0;
-    char 	*svr_database = NULL;
-    char	*username = NULL;
-    char	*password = NULL;
-    int		dbsize = 0;
-    List	*col_mapping_list;
-
-#ifdef DEBUG
-    elog(NOTICE, "couchdbPlanForeignScan");
-#endif
-
-    /* Fetch options  */
-    couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
-    //elog(NOTICE, "list length: %i", col_mapping_list->length);
-
-    /*
-     * Construct FdwPlan with cost estimates.
-     */
-    fdwplan = makeNode(FdwPlan);
-
-    /* Local databases are probably faster */
-    if (strcmp(svr_address, "127.0.0.1") == 0 || strcmp(svr_address, "localhost") == 0)
-    {
-        fdwplan->startup_cost = 10;
-    }
-    else
-        fdwplan->startup_cost = 25;
-
-    fdwplan->total_cost = 100 + fdwplan->startup_cost;
-    fdwplan->fdw_private = NIL;	/* not used */
-
-    couchdbGetDatabaseSize(svr_address, svr_port, svr_database, username, password, &dbsize);
-
-    fdwplan->total_cost = fdwplan->total_cost + dbsize;
-
-#ifdef DEBUG
-    elog(NOTICE, "new total cost: %f", fdwplan->total_cost);
-#endif
-
-    return fdwplan;
-}
 
 /*
  * couchdbBeginForeignScan
@@ -713,6 +688,163 @@ couchdbIterateForeignScan(ForeignScanState *node)
     return slot;
 }
 
+
+/*
+ * couchdbPlanForeignScan
+ *		Create a FdwPlan for a scan on the foreign table
+ */
+#if (PG_VERSION_NUM < 90200)
+static FdwPlan *
+couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
+{
+    FdwPlan	*fdwplan;
+    char	*svr_address = NULL;
+    int		svr_port = 0;
+    char 	*svr_database = NULL;
+    char	*username = NULL;
+    char	*password = NULL;
+    int		dbsize = 0;
+    List	*col_mapping_list;
+
+#ifdef DEBUG
+    elog(NOTICE, "couchdbPlanForeignScan");
+#endif
+
+    /* Fetch options  */
+    couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
+    //elog(NOTICE, "list length: %i", col_mapping_list->length);
+
+    /*
+     * Construct FdwPlan with cost estimates.
+     */
+    fdwplan = makeNode(FdwPlan);
+
+    /* Local databases are probably faster */
+    if (strcmp(svr_address, "127.0.0.1") == 0 || strcmp(svr_address, "localhost") == 0)
+    {
+        fdwplan->startup_cost = 10;
+    }
+    else
+        fdwplan->startup_cost = 25;
+
+    fdwplan->total_cost = 100 + fdwplan->startup_cost;
+    fdwplan->fdw_private = NIL;	/* not used */
+
+    couchdbGetDatabaseSize(svr_address, svr_port, svr_database, username, password, &dbsize);
+
+    fdwplan->total_cost = fdwplan->total_cost + dbsize;
+
+#ifdef DEBUG
+    elog(NOTICE, "new total cost: %f", fdwplan->total_cost);
+#endif
+
+    return fdwplan;
+}
+#endif
+
+
+
+#if (PG_VERSION_NUM >= 90200)
+/*
+ * couchdbPlanForeignScan
+ *		Create a FdwPlan for a scan on the foreign table
+ */
+
+static void couchdbGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
+{
+	    char	*svr_address = NULL;
+	    int		svr_port = 0;
+	    char 	*svr_database = NULL;
+	    char	*username = NULL;
+	    char	*password = NULL;
+	    int		dbsize = 0;
+	    List	*col_mapping_list;
+
+	#ifdef DEBUG
+	    elog(NOTICE, "couchdbGetForeignRelSize");
+	#endif
+
+	    /* Fetch options  */
+	    couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
+	    //elog(NOTICE, "list length: %i", col_mapping_list->length);
+
+	    couchdbGetDatabaseSize(svr_address, svr_port, svr_database, username, password, &dbsize);
+
+}
+
+// New
+static void estimate_costs(PlannerInfo *root, RelOptInfo *baserel, Cost *startup_cost, Cost *total_cost, Oid foreigntableid)
+
+{
+	    char	*svr_address = NULL;
+	    int		svr_port = 0;
+	    char 	*svr_database = NULL;
+	    char	*username = NULL;
+	    char	*password = NULL;
+	    List	*col_mapping_list;
+
+		
+	/* Fetch options  */
+	couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
+
+	/* Local databases are probably faster */
+	if (strcmp(svr_address, "127.0.0.1") == 0 || strcmp(svr_address, "localhost") == 0)
+		*startup_cost = 10;
+	else
+		*startup_cost = 25;
+
+
+	*total_cost = baserel->rows + *startup_cost;
+
+
+#ifdef DEBUG
+	elog(NOTICE, "new total cost: %f", *total_cost);
+#endif
+}
+
+static void couchdbGetForeignPaths(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid)
+{
+    Cost        startup_cost;
+    Cost        total_cost;
+
+
+    /* Estimate costs */
+    estimate_costs(root, baserel, &startup_cost, &total_cost, foreigntableid);
+
+
+    /* Create a ForeignPath node and add it as only possible path */
+    add_path(baserel, (Path *)
+          create_foreignscan_path(root, baserel,
+                                  baserel->rows,
+                                  startup_cost,
+                                  total_cost,
+                                  NIL, /* no pathkeys */
+                                  NULL, /* no outer rel either */
+                                  NIL)); /* no fdw_private data */
+}
+
+static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses)
+{
+    Index scan_relid = baserel->relid;
+
+
+    scan_clauses = extract_actual_clauses(scan_clauses, false);
+
+
+    /* Create the ForeignScan node */
+    return make_foreignscan(tlist,
+                        scan_clauses,
+                        scan_relid,
+                        NIL, /* no expressions to evaluate */
+                        NIL); /* no private state either */
+}
+
+static bool couchdbAnalyzeForeignTable(Relation relation,AcquireSampleRowsFunc *func,BlockNumber *totalpages)
+{
+	return false;
+}
+
+#endif
 
 
 /*
