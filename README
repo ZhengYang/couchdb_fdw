@@ -1,4 +1,4 @@
-CouchDB FDW (beta) for PostgreSQL 9.2+
+CouchDB FDW (beta) for PostgreSQL 9.1+  (Compatible PostgreSQL 9.2+)
 ======================================
 
 This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for
