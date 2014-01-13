@@ -89,17 +89,16 @@ Example
 * Initializing the server using curl:
 
 	- Create database:
-			curl -X PUT http://localhost:5984/testdb
+		curl -X PUT http://localhost:5984/testdb
 	- List databases:
-			curl -X GET http://localhost:5984/_all_dbs
+		curl -X GET http://localhost:5984/_all_dbs
 	- Create document:
-			curl -X PUT http://localhost:5984/testdb/mydoc_1 -d "{\"title\": \"My first document\", \"content\": \"Hello World!\"}"
+		curl -X PUT http://localhost:5984/testdb/mydoc_1 -d "{\"title\": \"My first document\", \"content\": \"Hello World!\"}"
 	- Create user:
-			curl -HContent-Type:application/json -vXPUT http://127.0.0.1:5984/_users/org.couchdb.user:testuser --data-binary "{\"_id\": \"org.couchdb.user:testuser\",\"name\": \"testuser\",\"roles\": [],\"type\": \"user\",\"password\": \"secret\"}"
+		curl -HContent-Type:application/json -vXPUT http://127.0.0.1:5984/_users/org.couchdb.user:testuser --data-binary "{\"_id\": \"org.couchdb.user:testuser\",\"name\": \"testuser\",\"roles\": [],\"type\": \"user\",\"password\": \"secret\"}"
 
-* Testing extension:
+* Testing the extension:
 			
-	:::sql
 	CREATE EXTENSION couchdb_fdw;
 	
 	--Then create a foreign server to connect to your CouchDB server:
