@@ -131,13 +131,15 @@ couchdb_fdw_handler(PG_FUNCTION_ARGS)
 {
     FdwRoutine *fdwroutine = makeNode(FdwRoutine);
 
+#if (PG_VERSION_NUM < 90200)
+    fdwroutine->PlanForeignScan = couchdbPlanForeignScan;
+#else
     // New 9.2 Api
-    //fdwroutine->PlanForeignScan = couchdbPlanForeignScan;
     fdwroutine->GetForeignRelSize = couchdbGetForeignRelSize;
     fdwroutine->GetForeignPaths = couchdbGetForeignPaths;
     fdwroutine->AnalyzeForeignTable = couchdbAnalyzeForeignTable;
     fdwroutine->GetForeignPlan = couchdbGetForeignPlan;
-
+#endif
 
     fdwroutine->ExplainForeignScan = couchdbExplainForeignScan;
     fdwroutine->BeginForeignScan = couchdbBeginForeignScan;
