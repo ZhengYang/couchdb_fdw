@@ -10,7 +10,7 @@
 #
 # IDENTIFICATION
 #                 couchdb_fdw/couchdb_fdw.control
-# 
+#
 ##########################################################################
 
 comment = 'Foreign data wrapper for querying a CouchDB server'
