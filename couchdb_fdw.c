@@ -822,7 +822,8 @@ static void couchdbGetForeignPaths(PlannerInfo *root,RelOptInfo *baserel,Oid for
                                   total_cost,
                                   NIL, /* no pathkeys */
                                   NULL, /* no outer rel either */
-                                  NIL)); /* no fdw_private data */
+                                  NULL,
+				  NULL)); /* no fdw_private data */
 }
 
 static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses)
@@ -838,7 +839,10 @@ static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel
                         scan_clauses,
                         scan_relid,
                         NIL, /* no expressions to evaluate */
-                        NIL); /* no private state either */
+                        NIL, /* no private state either */
+			NIL,
+			NIL,
+			NIL);
 }
 
 static bool couchdbAnalyzeForeignTable(Relation relation,AcquireSampleRowsFunc *func,BlockNumber *totalpages)
