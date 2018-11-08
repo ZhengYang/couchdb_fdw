@@ -411,8 +411,8 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
 
     char	*qual_key = NULL;
     char	*qual_value = NULL;
-    bool	equal = FALSE;
-    bool	pushdown = FALSE;
+    bool	equal = false;
+    bool	pushdown = false;
     int i;
 
 #ifdef DEBUG
@@ -440,8 +440,8 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
 
         /* retrieve the column name */
         initStringInfo(&col);
-        appendStringInfo(&col, "%s", NameStr(rel->rd_att->attrs[i]->attname));
-        mapped = FALSE;
+        appendStringInfo(&col, "%s", NameStr(TupleDescAttr(rel->rd_att, i)->attname));
+        mapped = false;
 
         /* check if the column name is mapping to a different name in couchdb */
         foreach(col_mapping, col_mapping_list)
@@ -451,7 +451,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
             {
                 initStringInfo(&mapping);
                 appendStringInfo(&mapping, "%s", defGetString(def));
-                mapped = TRUE;
+                mapped = true;
                 break;
             }
         }
@@ -480,7 +480,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
     festate->total_rows = total_rows;
     festate->offset = offset;
     festate->qual_list = NIL;
-    festate->qual_scanned = FALSE;
+    festate->qual_scanned = false;
     /* Store the additional state info */
     festate->attinmeta = TupleDescGetAttInMetadata(node->ss.ss_currentRelation->rd_att);
     node->fdw_state = (void *) festate;
@@ -500,7 +500,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
         StringInfoData	id;
         ListCell		*lc;
 
-        foreach (lc, node->ss.ps.qual)
+        foreach (lc, node->ss.ps.plan->qual)
         {
             /* Only _id can be pushed down */
             ExprState  *state = lfirst(lc);
@@ -515,7 +515,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
                 {
                     initStringInfo(&id);
                     appendStringInfo(&id, "%s", qual_value);
-                    pushdown = TRUE;
+                    pushdown = true;
                 }
 
                 /* always push in rev first */
@@ -588,7 +588,7 @@ couchdbIterateForeignScan(ForeignScanState *node)
     {
         if (qual_scanned)
         {
-            endOfScan = TRUE;
+            endOfScan = true;
         }
         else
         {
@@ -600,7 +600,7 @@ couchdbIterateForeignScan(ForeignScanState *node)
 
             couchdbGetDoc(svr_address, svr_port, svr_database, username, password,
                           _id, _rev, columns, num_of_columns, &column_data);
-            fstate->qual_scanned = TRUE;
+            fstate->qual_scanned = true;
         }
     }
     else
@@ -685,7 +685,7 @@ couchdbIterateForeignScan(ForeignScanState *node)
         }
 
         tuple = BuildTupleFromCStrings(fstate->attinmeta, values);
-        ExecStoreTuple(tuple, slot, InvalidBuffer, FALSE);
+        ExecStoreTuple(tuple, slot, InvalidBuffer, false);
     }
     return slot;
 }
@@ -816,17 +816,17 @@ static void couchdbGetForeignPaths(PlannerInfo *root,RelOptInfo *baserel,Oid for
 
     /* Create a ForeignPath node and add it as only possible path */
     add_path(baserel, (Path *)
-          create_foreignscan_path(root, baserel,
+          create_foreignscan_path(root, baserel, NULL,
                                   baserel->rows,
                                   startup_cost,
                                   total_cost,
                                   NIL, /* no pathkeys */
                                   NULL, /* no outer rel either */
                                   NULL,
-				  NULL)); /* no fdw_private data */
+				                  NIL)); /* no fdw_private data */
 }
 
-static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses)
+static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses, Plan *outer_plan)
 {
     Index scan_relid = baserel->relid;
 
@@ -840,9 +840,9 @@ static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel
                         scan_relid,
                         NIL, /* no expressions to evaluate */
                         NIL, /* no private state either */
-			NIL,
-			NIL,
-			NIL);
+			            NIL,
+			            NIL,
+			            outer_plan);
 }
 
 static bool couchdbAnalyzeForeignTable(Relation relation,AcquireSampleRowsFunc *func,BlockNumber *totalpages)
@@ -876,7 +876,11 @@ couchdbExplainForeignScan(ForeignScanState *node, ExplainState *es)
     /* Suppress file size if we're not showing cost details */
     if (es->costs)
     {
-        ExplainPropertyLong("Foreign CouchDB Database Size", dbsize, es);
+        #if PG_VERSION_NUM >= 110000
+		ExplainPropertyInteger("Foreign CouchDB Database Size", NULL, dbsize, es);
+	#else
+		ExplainPropertyLong("Foreign CouchDB Database Size", dbsize, es);
+	#endif
     }
 }
 
@@ -1492,7 +1496,6 @@ static int doc_handle_end_map(void * ctx)
         {
             /* check if there a _doc mapping column which means the entire doc will be used as a column */
             int doc_index;
-            bool has_doc = FALSE;
             const unsigned char *buf;
             size_t len;
             StringInfoData str;
@@ -1501,7 +1504,6 @@ static int doc_handle_end_map(void * ctx)
             {
                 if (strcmp(context->column_list[doc_index].data, "_doc") == 0)
                 {
-                    has_doc = TRUE;
                     break;
                 }
             }
@@ -1877,7 +1879,7 @@ couchdbGetQual(Node *node, TupleDesc tupdesc, List *col_mapping_list, char **key
             initStringInfo(&buf);
 
             /* And get the column and value... */
-            *key = NameStr(tupdesc->attrs[varattno - 1]->attname);
+            *key = NameStr(TupleDescAttr(tupdesc, varattno - 1)->attname);
             *value = TextDatumGetCString(((Const *) right)->constvalue);
 
 

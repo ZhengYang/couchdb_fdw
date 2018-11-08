@@ -125,7 +125,7 @@ struct CouchDBFdwOption
 	static void couchdbGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid);
 	static void couchdbGetForeignPaths(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid);
 	static bool couchdbAnalyzeForeignTable(Relation relation,AcquireSampleRowsFunc *func,BlockNumber *totalpages);
-	static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses);
+	static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses, Plan *outer_plan);
 	// New
 	static void estimate_costs(PlannerInfo *root,RelOptInfo *baserel,Cost *startup_cost,Cost *total_cost,Oid foreigntableid);
 #else
