@@ -14,6 +14,15 @@
  *----------------------------------------------------------
  */
 
+/*----------------------------------------------------------
+ *
+ * Ported to PostgreSQL 9.2+ Foreign Data Wrapper API
+ *
+ * Author: Gauthier Boabglio <gauthier.boaglio _4t_ gmail _D0t_ com>
+ *
+ *----------------------------------------------------------
+ */
+
 /* Debug mode flag */
 /* #define DEBUG */
 
@@ -41,6 +50,16 @@
 #include <yajl/yajl_parse.h>
 #include <yajl/yajl_common.h>
 #include <yajl/yajl_gen.h>
+
+
+// New 9.2 Api
+#if (PG_VERSION_NUM >= 90200)
+#include "optimizer/pathnode.h"
+#include "optimizer/restrictinfo.h"
+#include "optimizer/planmain.h"
+#include "utils/rel.h"
+#endif
+
 
 #include "couchdb_fdw.h"
 
@@ -112,7 +131,16 @@ couchdb_fdw_handler(PG_FUNCTION_ARGS)
 {
     FdwRoutine *fdwroutine = makeNode(FdwRoutine);
 
+#if (PG_VERSION_NUM < 90200)
     fdwroutine->PlanForeignScan = couchdbPlanForeignScan;
+#else
+    // New 9.2 Api
+    fdwroutine->GetForeignRelSize = couchdbGetForeignRelSize;
+    fdwroutine->GetForeignPaths = couchdbGetForeignPaths;
+    fdwroutine->AnalyzeForeignTable = couchdbAnalyzeForeignTable;
+    fdwroutine->GetForeignPlan = couchdbGetForeignPlan;
+#endif
+
     fdwroutine->ExplainForeignScan = couchdbExplainForeignScan;
     fdwroutine->BeginForeignScan = couchdbBeginForeignScan;
     fdwroutine->IterateForeignScan = couchdbIterateForeignScan;
@@ -359,57 +387,6 @@ couchdbGetOptions(Oid foreigntableid, char **address, int *port, char **database
 
 
 /*
- * couchdbPlanForeignScan
- *		Create a FdwPlan for a scan on the foreign table
- */
-static FdwPlan *
-couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
-{
-    FdwPlan	*fdwplan;
-    char	*svr_address = NULL;
-    int		svr_port = 0;
-    char 	*svr_database = NULL;
-    char	*username = NULL;
-    char	*password = NULL;
-    int		dbsize = 0;
-    List	*col_mapping_list;
-
-#ifdef DEBUG
-    elog(NOTICE, "couchdbPlanForeignScan");
-#endif
-
-    /* Fetch options  */
-    couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
-    //elog(NOTICE, "list length: %i", col_mapping_list->length);
-
-    /*
-     * Construct FdwPlan with cost estimates.
-     */
-    fdwplan = makeNode(FdwPlan);
-
-    /* Local databases are probably faster */
-    if (strcmp(svr_address, "127.0.0.1") == 0 || strcmp(svr_address, "localhost") == 0)
-    {
-        fdwplan->startup_cost = 10;
-    }
-    else
-        fdwplan->startup_cost = 25;
-
-    fdwplan->total_cost = 100 + fdwplan->startup_cost;
-    fdwplan->fdw_private = NIL;	/* not used */
-
-    couchdbGetDatabaseSize(svr_address, svr_port, svr_database, username, password, &dbsize);
-
-    fdwplan->total_cost = fdwplan->total_cost + dbsize;
-
-#ifdef DEBUG
-    elog(NOTICE, "new total cost: %f", fdwplan->total_cost);
-#endif
-
-    return fdwplan;
-}
-
-/*
  * couchdbBeginForeignScan
  *
  */
@@ -434,8 +411,8 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
 
     char	*qual_key = NULL;
     char	*qual_value = NULL;
-    bool	equal = FALSE;
-    bool	pushdown = FALSE;
+    bool	equal = false;
+    bool	pushdown = false;
     int i;
 
 #ifdef DEBUG
@@ -463,8 +440,8 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
 
         /* retrieve the column name */
         initStringInfo(&col);
-        appendStringInfo(&col, "%s", NameStr(rel->rd_att->attrs[i]->attname));
-        mapped = FALSE;
+        appendStringInfo(&col, "%s", NameStr(TupleDescAttr(rel->rd_att, i)->attname));
+        mapped = false;
 
         /* check if the column name is mapping to a different name in couchdb */
         foreach(col_mapping, col_mapping_list)
@@ -474,7 +451,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
             {
                 initStringInfo(&mapping);
                 appendStringInfo(&mapping, "%s", defGetString(def));
-                mapped = TRUE;
+                mapped = true;
                 break;
             }
         }
@@ -503,7 +480,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
     festate->total_rows = total_rows;
     festate->offset = offset;
     festate->qual_list = NIL;
-    festate->qual_scanned = FALSE;
+    festate->qual_scanned = false;
     /* Store the additional state info */
     festate->attinmeta = TupleDescGetAttInMetadata(node->ss.ss_currentRelation->rd_att);
     node->fdw_state = (void *) festate;
@@ -523,7 +500,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
         StringInfoData	id;
         ListCell		*lc;
 
-        foreach (lc, node->ss.ps.qual)
+        foreach (lc, node->ss.ps.plan->qual)
         {
             /* Only _id can be pushed down */
             ExprState  *state = lfirst(lc);
@@ -538,7 +515,7 @@ couchdbBeginForeignScan(ForeignScanState *node, int eflags)
                 {
                     initStringInfo(&id);
                     appendStringInfo(&id, "%s", qual_value);
-                    pushdown = TRUE;
+                    pushdown = true;
                 }
 
                 /* always push in rev first */
@@ -611,7 +588,7 @@ couchdbIterateForeignScan(ForeignScanState *node)
     {
         if (qual_scanned)
         {
-            endOfScan = TRUE;
+            endOfScan = true;
         }
         else
         {
@@ -623,7 +600,7 @@ couchdbIterateForeignScan(ForeignScanState *node)
 
             couchdbGetDoc(svr_address, svr_port, svr_database, username, password,
                           _id, _rev, columns, num_of_columns, &column_data);
-            fstate->qual_scanned = TRUE;
+            fstate->qual_scanned = true;
         }
     }
     else
@@ -708,11 +685,172 @@ couchdbIterateForeignScan(ForeignScanState *node)
         }
 
         tuple = BuildTupleFromCStrings(fstate->attinmeta, values);
-        ExecStoreTuple(tuple, slot, InvalidBuffer, FALSE);
+        ExecStoreTuple(tuple, slot, InvalidBuffer, false);
     }
     return slot;
 }
 
+
+/*
+ * couchdbPlanForeignScan
+ *		Create a FdwPlan for a scan on the foreign table
+ */
+#if (PG_VERSION_NUM < 90200)
+static FdwPlan *
+couchdbPlanForeignScan(Oid foreigntableid, PlannerInfo *root, RelOptInfo *baserel)
+{
+    FdwPlan	*fdwplan;
+    char	*svr_address = NULL;
+    int		svr_port = 0;
+    char 	*svr_database = NULL;
+    char	*username = NULL;
+    char	*password = NULL;
+    int		dbsize = 0;
+    List	*col_mapping_list;
+
+#ifdef DEBUG
+    elog(NOTICE, "couchdbPlanForeignScan");
+#endif
+
+    /* Fetch options  */
+    couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
+    //elog(NOTICE, "list length: %i", col_mapping_list->length);
+
+    /*
+     * Construct FdwPlan with cost estimates.
+     */
+    fdwplan = makeNode(FdwPlan);
+
+    /* Local databases are probably faster */
+    if (strcmp(svr_address, "127.0.0.1") == 0 || strcmp(svr_address, "localhost") == 0)
+    {
+        fdwplan->startup_cost = 10;
+    }
+    else
+        fdwplan->startup_cost = 25;
+
+    fdwplan->total_cost = 100 + fdwplan->startup_cost;
+    fdwplan->fdw_private = NIL;	/* not used */
+
+    couchdbGetDatabaseSize(svr_address, svr_port, svr_database, username, password, &dbsize);
+
+    fdwplan->total_cost = fdwplan->total_cost + dbsize;
+
+#ifdef DEBUG
+    elog(NOTICE, "new total cost: %f", fdwplan->total_cost);
+#endif
+
+    return fdwplan;
+}
+#endif
+
+
+
+#if (PG_VERSION_NUM >= 90200)
+/*
+ * couchdbPlanForeignScan
+ *		Create a FdwPlan for a scan on the foreign table
+ */
+
+static void couchdbGetForeignRelSize(PlannerInfo *root, RelOptInfo *baserel, Oid foreigntableid)
+{
+	    char	*svr_address = NULL;
+	    int		svr_port = 0;
+	    char 	*svr_database = NULL;
+	    char	*username = NULL;
+	    char	*password = NULL;
+	    int		dbsize = 0;
+	    List	*col_mapping_list;
+
+	#ifdef DEBUG
+	    elog(NOTICE, "couchdbGetForeignRelSize");
+	#endif
+
+	    /* Fetch options  */
+	    couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
+	    //elog(NOTICE, "list length: %i", col_mapping_list->length);
+
+	    couchdbGetDatabaseSize(svr_address, svr_port, svr_database, username, password, &dbsize);
+
+}
+
+// New
+static void estimate_costs(PlannerInfo *root, RelOptInfo *baserel, Cost *startup_cost, Cost *total_cost, Oid foreigntableid)
+
+{
+	    char	*svr_address = NULL;
+	    int		svr_port = 0;
+	    char 	*svr_database = NULL;
+	    char	*username = NULL;
+	    char	*password = NULL;
+	    List	*col_mapping_list;
+
+		
+	/* Fetch options  */
+	couchdbGetOptions(foreigntableid, &svr_address, &svr_port, &svr_database, &username, &password, &col_mapping_list);
+
+	/* Local databases are probably faster */
+	if (strcmp(svr_address, "127.0.0.1") == 0 || strcmp(svr_address, "localhost") == 0)
+		*startup_cost = 10;
+	else
+		*startup_cost = 25;
+
+
+	*total_cost = baserel->rows + *startup_cost;
+
+
+#ifdef DEBUG
+	elog(NOTICE, "new total cost: %f", *total_cost);
+#endif
+}
+
+static void couchdbGetForeignPaths(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid)
+{
+    Cost        startup_cost;
+    Cost        total_cost;
+
+
+    /* Estimate costs */
+    estimate_costs(root, baserel, &startup_cost, &total_cost, foreigntableid);
+
+
+    /* Create a ForeignPath node and add it as only possible path */
+    add_path(baserel, (Path *)
+          create_foreignscan_path(root, baserel, NULL,
+                                  baserel->rows,
+                                  startup_cost,
+                                  total_cost,
+                                  NIL, /* no pathkeys */
+                                  NULL, /* no outer rel either */
+                                  NULL,
+				                  NIL)); /* no fdw_private data */
+}
+
+static ForeignScan * couchdbGetForeignPlan(PlannerInfo *root,RelOptInfo *baserel,Oid foreigntableid, ForeignPath *best_path,List * tlist, List *scan_clauses, Plan *outer_plan)
+{
+    Index scan_relid = baserel->relid;
+
+
+    scan_clauses = extract_actual_clauses(scan_clauses, false);
+
+
+    /* Create the ForeignScan node */
+    return make_foreignscan(tlist,
+                        scan_clauses,
+                        scan_relid,
+                        NIL, /* no expressions to evaluate */
+                        NIL, /* no private state either */
+			            NIL,
+			            NIL,
+			            outer_plan);
+}
+
+static bool couchdbAnalyzeForeignTable(Relation relation,AcquireSampleRowsFunc *func,BlockNumber *totalpages)
+{
+	return false;
+}
+
+#endif
 
 
 /*
@@ -738,7 +876,11 @@ couchdbExplainForeignScan(ForeignScanState *node, ExplainState *es)
     /* Suppress file size if we're not showing cost details */
     if (es->costs)
     {
-        ExplainPropertyLong("Foreign CouchDB Database Size", dbsize, es);
+        #if PG_VERSION_NUM >= 110000
+		ExplainPropertyInteger("Foreign CouchDB Database Size", NULL, dbsize, es);
+	#else
+		ExplainPropertyLong("Foreign CouchDB Database Size", dbsize, es);
+	#endif
     }
 }
 
@@ -1354,7 +1496,6 @@ static int doc_handle_end_map(void * ctx)
         {
             /* check if there a _doc mapping column which means the entire doc will be used as a column */
             int doc_index;
-            bool has_doc = FALSE;
             const unsigned char *buf;
             size_t len;
             StringInfoData str;
@@ -1363,7 +1504,6 @@ static int doc_handle_end_map(void * ctx)
             {
                 if (strcmp(context->column_list[doc_index].data, "_doc") == 0)
                 {
-                    has_doc = TRUE;
                     break;
                 }
             }
@@ -1739,7 +1879,7 @@ couchdbGetQual(Node *node, TupleDesc tupdesc, List *col_mapping_list, char **key
             initStringInfo(&buf);
 
             /* And get the column and value... */
-            *key = NameStr(tupdesc->attrs[varattno - 1]->attname);
+            *key = NameStr(TupleDescAttr(tupdesc, varattno - 1)->attname);
             *value = TextDatumGetCString(((Const *) right)->constvalue);
 
 

@@ -1,4 +1,4 @@
-CouchDB FDW (beta) for PostgreSQL 9.1+
+CouchDB FDW (beta) for PostgreSQL 9.1+  (Compatible PostgreSQL 9.2+)
 ======================================
 
 This PostgreSQL extension implements a Foreign Data Wrapper (FDW) for
@@ -82,18 +82,54 @@ password:	The password to authenticate to the CouchDB server with.
 Example
 -------
 
-CREATE SERVER couchdb_server 
-	FOREIGN DATA WRAPPER couchdb_fdw 
-	OPTIONS (address '127.0.0.1', port '5984');
+* Initializing the CouchDB server using curl:
 
-CREATE FOREIGN TABLE couchdb_table (key text, value text) 
-	SERVER couchdb_server
-	OPTIONS (database 'testdb', key '_id', value '_doc');
+	- Create database:
+		curl -X PUT http://localhost:5984/testdb
+	- List databases:
+		curl -X GET http://localhost:5984/_all_dbs
+	- Create document:
+		curl -X PUT http://localhost:5984/testdb/mydoc_1 -d "{\"title\": \"My first document\", \"content\": \"Hello World!\"}"
+	- Create user:
+		curl -HContent-Type:application/json -vXPUT http://127.0.0.1:5984/_users/org.couchdb.user:testuser --data-binary "{\"_id\": \"org.couchdb.user:testuser\",\"name\": \"testuser\",\"roles\": [],\"type\": \"user\",\"password\": \"secret\"}"
 
-CREATE USER MAPPING FOR PUBLIC
-	SERVER couchdb_server
-	OPTIONS (username 'testuser', password 'secret');
+* Testing the extension:
+			
+	CREATE EXTENSION couchdb_fdw;
+	
+	--Then create a foreign server to connect to your CouchDB server:
+
+	CREATE SERVER couchdb_server 
+		FOREIGN DATA WRAPPER couchdb_fdw 
+		OPTIONS (address '127.0.0.1', port '5984');
+
+	-- Create a foreign table:
+
+	CREATE FOREIGN TABLE couchdb_table (key text, value text) 
+		SERVER couchdb_server
+		OPTIONS (database 'testdb', key '_id', value '_doc');
+
+	--Create user mapping:
+
+	CREATE USER MAPPING FOR PUBLIC
+		SERVER couchdb_server
+		OPTIONS (username 'testuser', password 'secret');	
+		
+	--And list documents...
+	
+	SELECT * FROM couchdb_table;
+
+
+* Ouput gives:
+
+"mydoc_1";"{"_id":"mydoc_1","_rev":"1-2fe116a139a166a7f85b85387327d4bc","title":"My first document","content":"Hello World!"}"
 
 -- 
 Zheng Yang
 zhengyang4k@gmail.com
+--
+Ported to PostgreSQL 9.2+ Foreign Data Wrapper API
+Gauthier Boaglio
+gauthier.boaglio _4t_ gmail _D0t_ com
+Windows installer: https://sourceforge.net/p/postgresql-mingw-w64/discussion/general/thread/0d15fd1a/#149e
+
